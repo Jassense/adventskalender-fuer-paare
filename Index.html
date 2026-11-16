@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adventskalender für Paare ❤️</title><style>
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#fff8f0;color:#222}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:28px;text-align:center}h2{margin-top:28px}
+.card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+input,textarea,select{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;font-size:16px;margin:6px 0 12px}
+button{width:100%;padding:14px;border:none;border-radius:12px;background:#b91c1c;color:#fff;font-size:17px;font-weight:700;cursor:pointer}
+button.sec{background:#333}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.door{background:#b91c1c;color:#fff;border-radius:12px;padding:16px 6px;text-align:center;cursor:pointer;font-weight:800}
+.door.open{background:#fff;color:#222;border:2px solid #b91c1c}.door small{display:block;font-weight:400;font-size:12px;margin-top:6px}
+.hidden{display:none}.ok{background:#dcfce7;padding:12px;border-radius:10px}.err{background:#fee2e2;padding:12px;border-radius:10px}
+label{font-weight:600;font-size:14px}
+.giftlink{word-break:break-all;background:#f3f4f6;padding:12px;border-radius:10px;font-size:13px}
+</style></head><body><div class="wrap">
+<div id="gate" class="card">
+<h1>🎄 Adventskalender für Paare ❤️</h1>
+<p style="text-align:center">Gib deinen Einmal-Code ein, den du nach dem Kauf bekommen hast.</p>
+<label>Dein Einmal-Code</label>
+<input id="code" placeholder="z.B. AB12-CD34" style="text-transform:uppercase">
+<button onclick="checkCode()">Kalender freischalten ❤️</button>
+<div id="gateMsg" style="margin-top:12px"></div>
+<p style="font-size:13px;color:#666;text-align:center">Dein Code wird erst verbraucht, wenn du deinen fertigen Kalender speicherst & verschickst. Vorher kannst du jederzeit abbrechen und später wiederkommen.</p>
+</div>
+
+<div id="builder" class="hidden">
+<h1>🎄 Euer Adventskalender ❤️</h1>
+<div class="card">
+<p id="codeInfo" style="font-size:13px;color:#666"></p>
+<label>Dein Name</label><input id="from" placeholder="z.B. Jessi">
+<label>Name deines Partners / deiner Partnerin</label><input id="to" placeholder="z.B. Schatz">
+<label>Eure Nachricht</label><textarea id="msg" rows="3" placeholder="z.B. 24 kleine Überraschungen nur für dich..."></textarea>
+<p style="font-size:13px;color:#666">Klicke auf ein Türchen und schreibe rein, was dahinter steckt: Text, Gutschein oder Spotify-Link.</p>
+<div id="doorsEdit"></div>
+<button onclick="saveCalendar()">Kalender speichern & Geschenk-Link erstellen 🎁</button>
+<div id="saveMsg" style="margin-top:12px"></div>
+<div id="giftBox" class="hidden">
+<p><b>Dein Geschenk-Link für deinen Partner / deine Partnerin:</b></p>
+<div class="giftlink" id="giftLink"></div>
+<button class="sec" style="margin-top:10px" onclick="copyGift()">Link kopieren</button>
+<p style="font-size:13px;color:#666">Diesen Link an deinen Partner schicken. Er / Sie sieht dann euren fertigen Kalender. Dein Code ist jetzt verbraucht.</p>
+</div>
+</div>
+</div>
+
+<div id="view" class="hidden">
+<h1 id="viewTitle">🎄 Adventskalender ❤️</h1>
+<p id="viewMsg" style="text-align:center"></p>
+<div class="grid" id="viewGrid"></div>
+<div id="doorContent" class="card hidden" style="margin-top:16px"></div>
+<p style="text-align:center;font-size:13px;color:#666"><a href="#" onclick="location.hash='';location.reload();return false;">Eigenen Kalender bauen</a></p>
+</div>
+</div>
+<script>
+const API="https://adventskalender-codes.divine-shadow-e1d7.workers.dev";
+let doors=Array(24).fill("");
+let currentCode="";
+let codeConsumed=false;
+const params=new URLSearchParams(location.search);
+if(params.get("gift")){ showGift(params.get("gift")); }
+else { const saved=localStorage.getItem("jassense_calendar_draft"); if(saved){ try{ const d=JSON.parse(saved); doors=d.doors||doors; currentCode=d.code||""; }catch(e){} } }
+
+function showBuilder(){ document.getElementById("gate").classList.add("hidden"); document.getElementById("builder").classList.remove("hidden"); document.getElementById("codeInfo").textContent = currentCode ? "Eingeloggter Code: "+currentCode+" — noch nicht verbraucht. Erst beim Speichern wird er verbraucht." : ""; renderEdit(); }
+function renderEdit(){
+  document.getElementById("doorsEdit").innerHTML=doors.map((d,i)=>'<label>Türchen '+(i+1)+'</label><input data-i="'+i+'" value="'+d.replace(/"/g,'&quot;')+'" placeholder="z.B. Gutschein: Massage oder https://open.spotify.com/..." oninput="doors[this.dataset.i]=this.value;saveDraft()">').join("");
+}
+function saveDraft(){
+  localStorage.setItem("jassense_calendar_draft", JSON.stringify({code:currentCode, from:document.getElementById("from").value, to:document.getElementById("to").value, msg:document.getElementById("msg").value, doors}));
+}
+async function checkCode(){
+  const code=document.getElementById("code").value.trim().toUpperCase();
+  const el=document.getElementById("gateMsg");
+  if(!code){ el.innerHTML='<div class="err">Bitte Code eingeben.</div>'; return; }
+  el.innerHTML="Prüfe Code...";
+  const r=await fetch(API+"/validate-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});
+  const d=await r.json();
+  if(!d.valid){ el.innerHTML='<div class="err">Code ungültig oder schon verbraucht. Bitte nochmal prüfen.</div>'; return; }
+  currentCode=code; codeConsumed=false;
+  el.innerHTML='<div class="ok">Code gültig! Er wird erst verbraucht, wenn du deinen Kalender speicherst.</div>';
+  // Draft wiederherstellen falls vorhanden
+  const saved=localStorage.getItem("jassense_calendar_draft");
+  if(saved){ try{ const sd=JSON.parse(saved); if(sd.code===code){ doors=sd.doors||doors; setTimeout(()=>{document.getElementById("from").value=sd.from||"";document.getElementById("to").value=sd.to||"";document.getElementById("msg").value=sd.msg||"";},100); } }catch(e){} }
+  setTimeout(showBuilder,600);
+}
+async function saveCalendar(){
+  const btnMsg=document.getElementById("saveMsg");
+  // Erst Code verbrauchen - genau jetzt, beim Verschicken
+  if(currentCode && !codeConsumed){
+    btnMsg.innerHTML="Verbrauche Code und erstelle Geschenk-Link...";
+    const r=await fetch(API+"/consume-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:currentCode})});
+    const d=await r.json();
+    if(!d.success && !d.alreadyUsed){ btnMsg.innerHTML='<div class="err">Code konnte nicht eingelöst werden. Bitte nochmal versuchen.</div>'; return; }
+    codeConsumed=true;
+  }
+  const data={from:document.getElementById("from").value,to:document.getElementById("to").value,msg:document.getElementById("msg").value,doors};
+  localStorage.setItem("jassense_calendar",JSON.stringify(data));
+  localStorage.removeItem("jassense_calendar_draft");
+  const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const link=location.origin+location.pathname+"?gift="+encoded;
+  document.getElementById("giftLink").textContent=link;
+  document.getElementById("giftBox").classList.remove("hidden");
+  btnMsg.innerHTML='<div class="ok">Fertig! Dein Code ist jetzt verbraucht und dein Geschenk-Link ist erstellt.</div>';
+}
+function copyGift(){ navigator.clipboard.writeText(document.getElementById("giftLink").textContent); alert("Link kopiert!"); }
+function showGift(encoded){
+  try{ const data=JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("view").classList.remove("hidden");
+  document.getElementById("viewTitle").textContent="🎄 Für "+(data.to||"dich")+" ❤️ von "+(data.from||"deinem Schatz");
+  document.getElementById("viewMsg").textContent=data.msg||"";
+  document.getElementById("viewGrid").innerHTML=data.doors.map((d,i)=>'<div class="door" onclick="openDoor('+i+',\''+encodeURIComponent(d||"")+'\')">'+(i+1)+'<small>tippen</small></div>').join("");
+  window._giftDoors=data.doors;
+  }catch(e){ document.getElementById("gateMsg").innerHTML='<div class="err">Geschenk-Link ungültig.</div>'; }
+}
+function openDoor(i,enc){
+  const txt=decodeURIComponent(enc);
+  const el=document.getElementById("doorContent");
+  el.classList.remove("hidden");
+  let inner='<h3>Türchen '+(i+1)+' ❤️</h3><p>'+(txt||"Noch leer.")+'</p>';
+  const m=txt.match(/https:\/\/open\.spotify\.com\/\S+/);
+  if(m){ inner+='<p><a href="'+m[0]+'" target="_blank">▶ Auf Spotify anhören</a></p>'; }
+  el.innerHTML=inner; el.scrollIntoView({behavior:"smooth"});
+  const cards=document.querySelectorAll("#viewGrid .door"); if(cards[i]) cards[i].classList.add("open");
+}
+</script></body></html>
