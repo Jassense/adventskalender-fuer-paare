@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - Codes</title><style>
+body{font-family:system-ui,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;background:#fff8f0}
+h1{font-size:22px}input,button{font-size:16px;padding:10px;border-radius:10px;border:1px solid #ccc;width:100%;box-sizing:border-box}
+button{background:#b91c1c;color:#fff;border:none;cursor:pointer;margin-top:10px}
+.code{font-size:28px;font-weight:800;letter-spacing:2px;background:#fff;border:2px dashed #b91c1c;padding:14px;text-align:center;border-radius:12px;margin-top:16px}
+.list{margin-top:16px;background:#fff;border-radius:12px;padding:12px}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-family:monospace}
+.used{color:#b91c1c}.fresh{color:#15803d}
+small{color:#666}
+</style></head><body>
+<h1>🎄 Admin - Einmal-Codes</h1>
+<p><small>Worker: https://adventskalender-codes.divine-shadow-e1d7.workers.dev</small></p>
+<label>Admin-Passwort</label>
+<input id="pw" type="password" placeholder="Dein ADMIN_PASSWORD" autocomplete="current-password">
+<button onclick="createCode()">+ Neuen Code erstellen</button>
+<button onclick="loadCodes()" style="background:#333">Codes neu laden</button>
+<div id="newCode"></div>
+<div class="list"><b>Alle Codes:</b><div id="list">Noch nicht geladen.</div></div>
+<script>
+const API = "https://adventskalender-codes.divine-shadow-e1d7.workers.dev";
+async function createCode(){
+  const pw = document.getElementById('pw').value;
+  const r = await fetch(API + "/create-code", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({password: pw})});
+  const d = await r.json();
+  if(d.error){ alert("Passwort falsch!"); return; }
+  document.getElementById('newCode').innerHTML = '<div class="code">'+d.code+'</div><p style="text-align:center">Diesen Code an die Käuferin schicken.</p>';
+  loadCodes();
+}
+async function loadCodes(){
+  const pw = document.getElementById('pw').value;
+  const r = await fetch(API + "/list-codes", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({password: pw})});
+  const d = await r.json();
+  if(d.error){ document.getElementById('list').innerHTML = "Passwort falsch!"; return; }
+  if(!d.codes.length){ document.getElementById('list').innerHTML = "Noch keine Codes."; return; }
+  document.getElementById('list').innerHTML = d.codes.map(c=>'<div class="row"><span>'+c.code+'</span><span class="'+(c.used?'used':'fresh')+'">'+(c.used?'VERBRAUCHT':'frisch')+'</span></div>').join('');
+}
+</script></body></html>
